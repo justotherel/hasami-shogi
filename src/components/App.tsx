@@ -1,16 +1,18 @@
 import { useRef, useState } from "react";
 
-import { HORIZONTAL_AXIS, VERTICAL_AXIS } from "./constants";
+import { HORIZONTAL_AXIS, VERTICAL_AXIS } from "../constants";
 
-import { PieceColor } from "./interfaces/piece-color";
-import { Player } from "./interfaces/player";
+import { PieceColor } from "../interfaces/piece-color";
+import { Player } from "../interfaces/player";
 
-import { Position } from "./game-engine/position";
-import { ActvieSide, GameEngine, GameState } from "./game-engine";
+import { ActvieSide } from "../game-engine/active-side";
+import { GameEngine } from "../game-engine";
+import { GameState } from "../game-engine/game-state";
+import { Position } from "../game-engine/position";
 
-import GameOverModal from "./components/GameOverModal";
-import PlayerCard from "./components/PlayerCard";
-import Tile from "./components/Tile";
+import GameOverModal from "./GameOverModal";
+import PlayerCard from "./PlayerCard";
+import Tile from "./Tile";
 
 interface Piece {
   position: Position;
@@ -47,6 +49,23 @@ const parseBoardState = (gameSate: GameState): Piece[] => {
     }
   });
   return pieces;
+};
+
+const calculateAdvantageAndCaptures = (gameData: GameData) => {
+  const advantage =
+    gameData.gameState.whiteCaptured - gameData.gameState.blackCaptured;
+
+  if (advantage > 0) {
+    gameData.player1.advantage = advantage;
+  } else if (advantage < 0) {
+    gameData.player2.advantage = Math.abs(advantage);
+  } else {
+    gameData.player1.advantage = 0;
+    gameData.player2.advantage = 0;
+  }
+
+  gameData.player1.captured = gameData.gameState.whiteCaptured;
+  gameData.player2.captured = gameData.gameState.blackCaptured;
 };
 
 const App = () => {
@@ -165,29 +184,16 @@ const App = () => {
       if (newGameState) {
         setGameData((previous) => {
           const newGameData = { ...previous };
-          const advantage =
-            newGameState.whiteCaptured - newGameState.blackCaptured;
-
-          if (advantage > 0) {
-            newGameData.player1.advantage = advantage;
-          } else if (advantage < 0) {
-            newGameData.player2.advantage = Math.abs(advantage);
-          } else {
-            newGameData.player1.advantage = 0;
-            newGameData.player2.advantage = 0;
-          }
-
-          newGameData.player1.captured = newGameState.whiteCaptured;
-          newGameData.player2.captured = newGameState.blackCaptured;
-
+          calculateAdvantageAndCaptures(newGameData);
           return { ...previous, gameState: newGameState };
         });
         setPieces(() => parseBoardState(gameData.gameState));
       }
 
-      activePiece.style.position = "relative";
+      activePiece.style.position = "static";
       activePiece.style.removeProperty("top");
       activePiece.style.removeProperty("left");
+      activePiece.style.removeProperty("height");
 
       setActivePiece(null);
     }
@@ -198,6 +204,7 @@ const App = () => {
     setGameData((previous) => {
       const newGameData = { ...previous };
       newGameData.gameState = gameEngine.gameState;
+      calculateAdvantageAndCaptures(newGameData);
       return newGameData;
     });
     setPieces(() => parseBoardState(gameData.gameState));
@@ -205,27 +212,28 @@ const App = () => {
 
   return (
     <>
-      <div className="flex justify-center h-screen items-center bg-orange-100 subpixel-antialiased">
-        <div className="w-2/3 2xl:w-1/2 lg:max-w-4xl shadow-custom bg-emerald-200 rounded-t-lg border-b-2 border-black">
-          <header className="border-2 border-black h-full p-2 pl-6 bg-red-300 rounded-t-lg font-mono text-2xl">
+      <div className="h-screen flex justify-center items-center bg-orange-100 subpixel-antialiased">
+        <div className="w-full md:w-4/5 m-4 customXl:w-2/5 xl:w-3/5 2xl:w-2/5 shadow-custom bg-emerald-200 rounded-t-lg border-b-2 border-black">
+          <header className="border-2 p-2 border-black bg-red-300 rounded-t-lg font-mono text-2xl">
             HASAMI SHOGI
           </header>
           <PlayerCard
             player={gameData.player2}
             enemyColor={gameData.player1.pieceColor}
           />
-          <div className="text-center border-black border-2 border-t-0 border-b-0 pl-6 pr-6">
-            {gameData.gameState.isGameOver && (
+          <div className="text-center border-black border-2 border-t-0 border-b-0 md:pl-6 md:pr-6">
+            {!!gameData.gameState.winner && (
               <GameOverModal
-                loser={gameData.gameState.actvieSide === ActvieSide.WHITE_TO_MOVE ? gameData.player2 : gameData.player1}
-                winner={gameData.gameState.actvieSide === ActvieSide.WHITE_TO_MOVE ? gameData.player1 : gameData.player2}
+                winner={gameData.gameState.winner}
+                player1={gameData.player1}
+                player2={gameData.player2}
                 handleMouseClick={() => restartGame()}
               />
             )}
             <div
               id="board"
               ref={boardRef}
-              className="grid grid-cols-8 border-black border-8 box-content"
+              className="grid grid-cols-8 box-content md:border-4 md:border-black"
               onMouseDown={(e) => grabPiece(e)}
               onMouseMove={(e) => movePiece(e)}
               onMouseUp={(e) => dropPiece(e)}

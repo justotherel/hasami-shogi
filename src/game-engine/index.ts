@@ -5,25 +5,15 @@ import {
   WINNING_POSITIONS_INT32,
 } from "../constants";
 
-import { toInt32 } from "./int32-math-helper";
+import { ActvieSide } from "./active-side";
+import { GameState } from "./game-state";
 import { Position } from "./position";
+import { toInt32 } from "./int32-math-helper";
+import { Winner } from "./winner";
 
-export enum ActvieSide {
-  WHITE_TO_MOVE = "w",
-  BLACK_TO_MOVE = "b",
-}
-
-export enum PieceColor {
+enum PieceColor {
   WHITE = 1,
   BLACK = -1,
-}
-
-export interface GameState {
-  board: number[];
-  actvieSide: ActvieSide;
-  isGameOver?: boolean;
-  whiteCaptured: number;
-  blackCaptured: number;
 }
 
 export class GameEngine {
@@ -60,9 +50,9 @@ export class GameEngine {
     this.gameState.board = [];
     this.gameState.whiteCaptured = 0;
     this.gameState.blackCaptured = 0;
+    this.gameState.winner = undefined;
     this.gameState.actvieSide = ActvieSide.WHITE_TO_MOVE;
     this.removalQueue = [];
-    this.gameState.isGameOver = false;
     this.setPosition(DEFAULT_STARTING_POSITION_FEN);
   }
 
@@ -74,11 +64,41 @@ export class GameEngine {
   public getValidMoves(pos: Position): number[] {
     const validMoves: number[] = [];
 
+    const neighbors = pos
+      .crossNeighbors()
+      .filter((el) => this.gameState.board[el.toIndex()] !== 0);
+
+    neighbors.forEach((el) => {
+      let direction = 0;
+
+      if (el.x === pos.x) {
+        direction = el.y - pos.y;
+        const newY = el.y + direction;
+
+        if (newY > 0 && newY < this.cols - 1) {
+          const newIndex = new Position(el.x, newY).toIndex();
+          if (this.gameState.board[newIndex] === 0) {
+            validMoves.push(newIndex);
+          }
+        }
+      }
+
+      if (el.y === pos.y) {
+        direction = el.x - pos.x;
+        const newX = el.x + direction;
+        if (newX > 0 && newX < this.cols - 1) {
+          const newIndex = new Position(newX, el.y).toIndex();
+          if (this.gameState.board[newIndex] === 0) {
+            validMoves.push(newIndex);
+          }
+        }
+      }
+    });
+
     if (pos.x < this.cols - 1) {
       for (let i = pos.x + 1; i < this.cols; i++) {
         const nextIndex = this.coordsToIndex(i, pos.y);
         if (this.gameState.board[nextIndex]) {
-          // implement jumping over
           break;
         }
         validMoves.push(nextIndex);
@@ -88,17 +108,15 @@ export class GameEngine {
       for (let i = pos.x - 1; i >= 0; i--) {
         const nextIndex = this.coordsToIndex(i, pos.y);
         if (this.gameState.board[nextIndex]) {
-          // implement jumping over
           break;
         }
         validMoves.push(nextIndex);
       }
     }
     if (pos.y < this.rows - 1) {
-      for (let i = pos.y + 1; i < this.rows - 1; i++) {
+      for (let i = pos.y + 1; i < this.rows; i++) {
         const nextIndex = this.coordsToIndex(pos.x, i);
         if (this.gameState.board[nextIndex]) {
-          // implement jumping over
           break;
         }
         validMoves.push(nextIndex);
@@ -108,7 +126,6 @@ export class GameEngine {
       for (let i = pos.y - 1; i >= 0; i--) {
         const nextIndex = this.coordsToIndex(pos.x, i);
         if (this.gameState.board[nextIndex]) {
-          // implement jumping over
           break;
         }
         validMoves.push(nextIndex);
@@ -125,7 +142,7 @@ export class GameEngine {
   }
 
   public playMove(startPos: Position, endPos: Position): GameState | undefined {
-    if (this.gameState.isGameOver) return undefined;
+    if (this.gameState.winner) return undefined;
 
     if (this.gameState.board[startPos.toIndex()] != this.activeColor()) {
       return undefined;
@@ -141,15 +158,11 @@ export class GameEngine {
     this.movePiece(startPos, endPos);
     this.checkForCaptures(endPos);
     this.emptyRemovalQueue();
+    this.gameState.winner = this.checkGameOverConditions();
 
-    if (this.checkWinningCondition()) {
-      this.gameState.isGameOver = true;
-      console.log(`GAME OVER, ${this.gameState.actvieSide} WON!!!`);
-      return this.gameState;
+    if (this.gameState.winner === undefined) {
+      this.changeActiveColor();
     }
-
-    this.changeActiveColor();
-    // ???
 
     return this.gameState;
   }
@@ -183,9 +196,32 @@ export class GameEngine {
     this.gameState.board[index] = 0;
   }
 
-  public checkWinningCondition(): boolean {
+  public checkGameOverConditions(): Winner | undefined {
+    if (
+      this.gameState.whiteCaptured > 14 &&
+      this.gameState.blackCaptured > 14
+    ) {
+      return Winner.draw;
+    }
+
+    if (this.gameState.whiteCaptured > 14) {
+      return Winner.white_won;
+    }
+
+    if (this.gameState.blackCaptured > 14) {
+      return Winner.black_won;
+    }
+
     const bitmap = this.getBoardBitmap(this.activeColor());
-    return this.winningPositionsBitmaps.some((bm) => (bm & bitmap) === bm);
+
+    if (this.winningPositionsBitmaps.some((bm) => (bm & bitmap) === bm)) {
+      if (this.gameState.actvieSide === ActvieSide.WHITE_TO_MOVE)
+        return Winner.white_won;
+      if (this.gameState.actvieSide === ActvieSide.BLACK_TO_MOVE)
+        return Winner.black_won;
+    }
+
+    return undefined;
   }
 
   public checkForCaptures(pos: Position) {

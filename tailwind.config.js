@@ -6,9 +6,8 @@ export default {
   ],
   theme: {
     extend: {
-      spacing: {
-        '68': '17rem',
-        '76': '19rem'
+      screens: {
+        'customXl': { 'raw': '((min-width: 1280px) and (max-height: 1000px))' },
       },
       animationDelay500: {
         'animation-delay': '500ms'
@@ -26,11 +25,11 @@ export default {
         zoomInOut: {
           '0%': { transform: 'scale(0, 0)' },
           '75%': { transform: 'scale(1.15, 1.15)' },
-          '100': {transform: 'scale(1, 1)'},
+          '100': { transform: 'scale(1, 1)' },
         },
         slideUp: {
           '0%': { transform: 'translateY(35%)', opacity: 0 },
-          '100': {transform: 'translateY(0%)', opacity: 1},
+          '100': { transform: 'translateY(0%)', opacity: 1 },
         }
       },
       animation: {
