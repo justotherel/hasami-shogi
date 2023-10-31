@@ -2,4 +2,4 @@
 
 This is an implementation of a japanese board game Hasami Shogi. 
 
-Currently, you can play it hotseat-style in the browser.
+Currently, you can play it hotseat-style in the browser [here](https://justotherel.github.io/hasami-shogi/)
