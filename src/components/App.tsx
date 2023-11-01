@@ -212,7 +212,7 @@ const App = () => {
 
   return (
     <>
-      <div className="h-screen flex justify-center items-center bg-orange-100 subpixel-antialiased">
+      <div className="h-100dvh flex justify-center items-center bg-orange-100 subpixel-antialiased">
         <div className="w-full md:w-4/5 m-4 customXl:w-2/5 xl:w-3/5 2xl:w-2/5 shadow-custom bg-emerald-200 rounded-t-lg border-b-2 border-black">
           <header className="border-2 p-2 border-black bg-red-300 rounded-t-lg font-mono text-2xl">
             HASAMI SHOGI

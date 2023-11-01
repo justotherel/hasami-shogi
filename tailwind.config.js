@@ -6,6 +6,9 @@ export default {
   ],
   theme: {
     extend: {
+      height: {
+        '100dvh': '100dvh'
+      },
       screens: {
         'customXl': { 'raw': '((min-width: 1280px) and (max-height: 1000px))' },
       },
