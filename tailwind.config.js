@@ -38,6 +38,11 @@ export default {
       animation: {
         zoomInOut: 'zoomInOut 0.35s ease-in-out',
         slideUp: 'slideUp 0.5s linear'
+      },
+
+      gridTemplateRows: {
+        // Complex site-specific column configuration
+        'main': '100px 1fr 100px',
       }
     },
   },
