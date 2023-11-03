@@ -1,18 +1,26 @@
 import { PieceColor } from "../interfaces/piece-color";
 import { Player } from "../interfaces/player";
 
-interface Props {
+const PlayerCard = (props: {
   player: Player;
+  width: number;
+  height: number;
   enemyColor: PieceColor;
-  length: number;
+  parentRef: React.MutableRefObject<HTMLElement | null>;
   top?: boolean;
-}
+}) => {
+  let { height, width } = props;
+  const { parentRef, player, enemyColor } = props;
 
-const PlayerCard = (props: Props) => {
-  const { player, enemyColor, length, top} = props;
+  const element = parentRef.current;
+  if (element && height === 0 && width === 0) {
+    const size = element?.getBoundingClientRect();
+    height = size.height;
+    width = size.width;
+  }
 
+  const minDim = Math.min(height - 252, width);
   const captures = [];
-  const padding = top ? 'pt-2 pb-2' : 'pb-3 border-b-2'
 
   if (player && player.captured) {
     for (let i = 0; i < player.captured; i++) {
@@ -33,14 +41,14 @@ const PlayerCard = (props: Props) => {
 
   return (
     <div
-      className={`border-l-2 border-r-2 border-black flex items-top justify-start font-mono text-lg pl-2 md:pl-6 ${padding} bg-emerald-200`}
-      style={{ width: length }}
+      className={`bg-emerald-200 flex max-h-[100px] w-full items-top justify-start font-mono text-lg pt-2 pb-3`}
+      style={{ width: minDim }}
     >
       <div
-        className={`${player.image} h-12 md:h-16 max-h-full aspect-square bg-contain border-4 border-red-500 shadow-button-hover`}
+        className={`ml-2 md:ml-0 aspect-square h-16 bg-contain border-4 border-red-500 shadow-button-hover ${player.image} `}
       ></div>
       <div>
-        <p className="pl-3 md:pl-4">{player.name}</p>
+        <p className="pl-3">{player.name}</p>
         <div className="pl-6 md:pl-8 flex items-center">{captures}</div>
       </div>
     </div>

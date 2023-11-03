@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 
 import { HORIZONTAL_AXIS, VERTICAL_AXIS } from "../constants";
 
@@ -25,6 +25,22 @@ interface Piece {
   position: Position;
   color?: PieceColor;
 }
+
+const bordIndexFromPos = (
+  clientX: number,
+  clientY: number,
+  board: HTMLDivElement,
+  element: HTMLDivElement
+): { x: number; y: number } => {
+  const tileSize = element.parentElement!.offsetHeight;
+  const boardHeight = tileSize * VERTICAL_AXIS.length;
+
+  const x = Math.floor((clientX - board.offsetLeft) / tileSize);
+  const y = Math.abs(
+    Math.ceil((clientY - board.offsetTop - boardHeight) / tileSize)
+  );
+  return { x, y };
+};
 
 const parseBoardState = (gameSate: GameState): Piece[] => {
   const pieces: Piece[] = [];
@@ -81,6 +97,8 @@ const Board = (props: Props) => {
 
   const board = [];
 
+  const [activeTouch, setActiveTouch] = useState<Touch>();
+
   for (let j = VERTICAL_AXIS.length - 1; j >= 0; j--) {
     for (let i = 0; i < HORIZONTAL_AXIS.length; i++) {
       const piece = pieces.find((p) => p.position.isEqual(new Position(i, j)));
@@ -105,8 +123,30 @@ const Board = (props: Props) => {
     }
   }
 
-  const grabPiece = (e: React.MouseEvent<HTMLDivElement>) => {
+  const grabPiece = (
+    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
+  ) => {
+    let clientX: number;
+    let clientY: number;
+
+    e.preventDefault();
+
+    console.log("GRAB PIECE EVENT");
+
+    if (e instanceof MouseEvent) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else {
+      if (!activeTouch) {
+        setActiveTouch((e as unknown as TouchEvent).touches[0]);
+      }
+
+      clientX = (e as unknown as TouchEvent).touches[0].clientX;
+      clientY = (e as unknown as TouchEvent).touches[0].clientY;
+    }
+
     const element = e.target as HTMLDivElement;
+
     const board = boardRef.current;
     const activeColor =
       gameData.gameState.actvieSide === ActvieSide.WHITE_TO_MOVE
@@ -117,18 +157,13 @@ const Board = (props: Props) => {
       element.classList.contains(activeColor) &&
       board
     ) {
-      const tileSize = element.parentElement!.offsetHeight;
-      const boardHeight = tileSize * VERTICAL_AXIS.length;
-      const currentX = Math.floor((e.clientX - board.offsetLeft) / tileSize);
-      const currentY = Math.abs(
-        Math.ceil((e.clientY - board.offsetTop - boardHeight) / tileSize)
-      );
-
-      setGrabPosition(new Position(currentX, currentY));
+      const gridCoords = bordIndexFromPos(clientX, clientY, board, element);
+      console.log(clientX, clientY, gridCoords.x, gridCoords.y);
+      setGrabPosition(new Position(gridCoords.x, gridCoords.y));
 
       const size = element.offsetHeight;
-      const x = e.clientX - size * 0.5;
-      const y = e.clientY - size * 0.5;
+      const x = clientX - size * 0.5;
+      const y = clientY - size * 0.5;
 
       element.style.position = "absolute";
       element.style.left = `${x}px`;
@@ -139,8 +174,29 @@ const Board = (props: Props) => {
     }
   };
 
-  const movePiece = (e: React.MouseEvent<HTMLDivElement>) => {
+  const movePiece = (
+    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
+  ) => {
     const board = boardRef.current;
+
+    let clientX: number;
+    let clientY: number;
+
+    if (e instanceof MouseEvent) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else {
+      clientX = activeTouch!.clientX;
+      clientY = activeTouch!.clientY;
+
+      for (const touch of (e as unknown as TouchEvent).changedTouches) {
+        if (touch.identifier === activeTouch?.identifier) {
+          clientX = touch.clientX;
+          clientY = touch.clientY;
+        }
+      }
+    }
+
     if (activePiece && board) {
       const size = activePiece.offsetHeight;
 
@@ -150,8 +206,8 @@ const Board = (props: Props) => {
       const maxX = board.offsetLeft + board.clientWidth - size * 0.75;
       const maxY = board.offsetTop + board.clientHeight - size * 0.75;
 
-      const x = e.clientX - size * 0.5;
-      const y = e.clientY - size * 0.5;
+      const x = clientX - size * 0.5;
+      const y = clientY - size * 0.5;
 
       activePiece.style.position = "absolute";
       activePiece.style.left = `${x > maxX ? maxX : Math.max(minX, x)}px`;
@@ -160,22 +216,43 @@ const Board = (props: Props) => {
     }
   };
 
-  const dropPiece = (e: React.MouseEvent<HTMLDivElement>) => {
+  const dropPiece = (
+    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
+  ) => {
+    e.preventDefault();
+
     const board = boardRef.current;
     const element = e.target as HTMLDivElement;
 
-    if (activePiece && board) {
-      const tileSize = element.parentElement!.offsetHeight;
-      const boardHeight = tileSize * VERTICAL_AXIS.length;
+    let clientX: number;
+    let clientY: number;
 
-      const newX = Math.floor((e.clientX - board.offsetLeft) / tileSize);
-      const newY = Math.abs(
-        Math.ceil((e.clientY - board.offsetTop - boardHeight) / tileSize)
-      );
+    console.log("DROP PIECE EVENT");
+
+    if (e instanceof MouseEvent) {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    } else {
+      clientX = activeTouch!.clientX;
+      clientY = activeTouch!.clientY;
+
+      if ((e as unknown as TouchEvent).changedTouches) {
+        for (const touch of (e as unknown as TouchEvent).changedTouches) {
+          if (touch.identifier === activeTouch?.identifier) {
+            clientX = touch.clientX;
+            clientY = touch.clientY;
+          }
+        }
+      }
+    }
+
+    if (activePiece && board) {
+      const gridCoords = bordIndexFromPos(clientX, clientY, board, element);
+      console.log(clientX, clientY, gridCoords.x, gridCoords.y);
 
       const newGameState = gameEngine.playMove(
         grabPosition,
-        new Position(newX, newY)
+        new Position(gridCoords.x, gridCoords.y)
       );
 
       if (newGameState) {
@@ -193,6 +270,7 @@ const Board = (props: Props) => {
       activePiece.style.removeProperty("height");
 
       setActivePiece(null);
+      setActiveTouch(undefined);
     }
   };
 
@@ -220,10 +298,14 @@ const Board = (props: Props) => {
       <div
         id="board"
         ref={boardRef}
-        className="grid grid-cols-8  border-black border-4 bg-emerald-200"
+        className="grid grid-cols-8  border-black md:border-4 bg-emerald-200"
         onMouseDown={(e) => grabPiece(e)}
         onMouseMove={(e) => movePiece(e)}
         onMouseUp={(e) => dropPiece(e)}
+        onTouchStart={(e) => grabPiece(e)}
+        onTouchMove={(e) => movePiece(e)}
+        onTouchEnd={(e) => dropPiece(e)}
+        onContextMenu={(e) => e.preventDefault()}
         style={{
           height: minDim,
           width: minDim,
