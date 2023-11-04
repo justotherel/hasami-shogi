@@ -94,10 +94,9 @@ const Board = (props: Props) => {
   );
   const [activePiece, setActivePiece] = useState<HTMLElement | null>(null);
   const [pieces, setPieces] = useState(parseBoardState(gameData.gameState));
+  const [activeTouch, setActiveTouch] = useState<React.Touch>();
 
   const board = [];
-
-  const [activeTouch, setActiveTouch] = useState<Touch>();
 
   for (let j = VERTICAL_AXIS.length - 1; j >= 0; j--) {
     for (let i = 0; i < HORIZONTAL_AXIS.length; i++) {
@@ -124,41 +123,22 @@ const Board = (props: Props) => {
   }
 
   const grabPiece = (
-    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
+    clientX: number,
+    clientY: number,
+    element: HTMLDivElement
   ) => {
-    let clientX: number;
-    let clientY: number;
-
-    e.preventDefault();
-
-    console.log("GRAB PIECE EVENT");
-
-    if (e instanceof MouseEvent) {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    } else {
-      if (!activeTouch) {
-        setActiveTouch((e as unknown as TouchEvent).touches[0]);
-      }
-
-      clientX = (e as unknown as TouchEvent).touches[0].clientX;
-      clientY = (e as unknown as TouchEvent).touches[0].clientY;
-    }
-
-    const element = e.target as HTMLDivElement;
-
     const board = boardRef.current;
     const activeColor =
       gameData.gameState.actvieSide === ActvieSide.WHITE_TO_MOVE
         ? PieceColor.WHITE
         : PieceColor.BLACK;
+
     if (
       element.classList.contains("piece") &&
       element.classList.contains(activeColor) &&
       board
     ) {
       const gridCoords = bordIndexFromPos(clientX, clientY, board, element);
-      console.log(clientX, clientY, gridCoords.x, gridCoords.y);
       setGrabPosition(new Position(gridCoords.x, gridCoords.y));
 
       const size = element.offsetHeight;
@@ -174,28 +154,8 @@ const Board = (props: Props) => {
     }
   };
 
-  const movePiece = (
-    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
-  ) => {
+  const movePiece = (clientX: number, clientY: number) => {
     const board = boardRef.current;
-
-    let clientX: number;
-    let clientY: number;
-
-    if (e instanceof MouseEvent) {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    } else {
-      clientX = activeTouch!.clientX;
-      clientY = activeTouch!.clientY;
-
-      for (const touch of (e as unknown as TouchEvent).changedTouches) {
-        if (touch.identifier === activeTouch?.identifier) {
-          clientX = touch.clientX;
-          clientY = touch.clientY;
-        }
-      }
-    }
 
     if (activePiece && board) {
       const size = activePiece.offsetHeight;
@@ -217,34 +177,11 @@ const Board = (props: Props) => {
   };
 
   const dropPiece = (
-    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
+    clientX: number,
+    clientY: number,
+    element: HTMLDivElement
   ) => {
-    e.preventDefault();
-
     const board = boardRef.current;
-    const element = e.target as HTMLDivElement;
-
-    let clientX: number;
-    let clientY: number;
-
-    console.log("DROP PIECE EVENT");
-
-    if (e instanceof MouseEvent) {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    } else {
-      clientX = activeTouch!.clientX;
-      clientY = activeTouch!.clientY;
-
-      if ((e as unknown as TouchEvent).changedTouches) {
-        for (const touch of (e as unknown as TouchEvent).changedTouches) {
-          if (touch.identifier === activeTouch?.identifier) {
-            clientX = touch.clientX;
-            clientY = touch.clientY;
-          }
-        }
-      }
-    }
 
     if (activePiece && board) {
       const gridCoords = bordIndexFromPos(clientX, clientY, board, element);
@@ -270,7 +207,6 @@ const Board = (props: Props) => {
       activePiece.style.removeProperty("height");
 
       setActivePiece(null);
-      setActiveTouch(undefined);
     }
   };
 
@@ -283,6 +219,51 @@ const Board = (props: Props) => {
       return newGameData;
     });
     setPieces(() => parseBoardState(gameData.gameState));
+  };
+
+  const getChangedTouchById = (touchList: React.TouchList): React.Touch | undefined => {
+    for (let i = 0; i < touchList.length; i++) {
+      if (touchList.item(i).identifier === activeTouch?.identifier) {
+        return touchList.item(i)
+      }
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    grabPiece(e.clientX, e.clientY, e.target as HTMLDivElement);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    movePiece(e.clientX, e.clientY);
+  };
+
+  const handleMouseUp = (e: React.MouseEvent<HTMLDivElement>) => {
+    dropPiece(e.clientX, e.clientY, e.target as HTMLDivElement);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const touch = e.touches[0];
+    if (!activeTouch) {
+      setActiveTouch(touch);
+    }
+    grabPiece(touch.clientX, touch.clientY, e.target as HTMLDivElement);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    const touch = getChangedTouchById(e.changedTouches);
+
+    if (touch) {
+      movePiece(touch.clientX, touch.clientY);
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    const touch = getChangedTouchById(e.changedTouches);
+
+    if (touch) {
+      dropPiece(touch.clientX, touch.clientY, e.target as HTMLDivElement);
+      setActiveTouch(undefined);
+    }
   };
 
   return (
@@ -299,12 +280,12 @@ const Board = (props: Props) => {
         id="board"
         ref={boardRef}
         className="grid grid-cols-8  border-black md:border-4 bg-emerald-200"
-        onMouseDown={(e) => grabPiece(e)}
-        onMouseMove={(e) => movePiece(e)}
-        onMouseUp={(e) => dropPiece(e)}
-        onTouchStart={(e) => grabPiece(e)}
-        onTouchMove={(e) => movePiece(e)}
-        onTouchEnd={(e) => dropPiece(e)}
+        onMouseDown={(e) => handleMouseDown(e)}
+        onMouseMove={(e) => handleMouseMove(e)}
+        onMouseUp={(e) => handleMouseUp(e)}
+        onTouchStart={(e) => handleTouchStart(e)}
+        onTouchMove={(e) => handleTouchMove(e)}
+        onTouchEnd={(e) => handleTouchEnd(e)}
         onContextMenu={(e) => e.preventDefault()}
         style={{
           height: minDim,
